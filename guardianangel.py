@@ -1,6 +1,12 @@
 import time
+from ssh import connect, dissconnect, execute
 from scapy.all import AsyncSniffer
 from scapy.layers.inet import IP, TCP
+import json
+
+with open("config.json", "r") as json_file:
+    data = json.load(json_file)
+    syn_threshold = data["syn_threshold"]
 
 block_ip = "sudo iptables -I INPUT 1 -s 1.1.1.1 -j DROP"
 one_liner = "sudo iptables -I INPUT 1` -s 1.1.1.1 -j DROP && sudo iptables -L INPUT -n"
@@ -28,12 +34,14 @@ def analyze(packet):
         else:
             ip_tracker[source_ip][1].add(dport)
         
-        if len(ip_tracker[source_ip][1]) > 10:
+        if len(ip_tracker[source_ip][1]) > syn_threshold:
             print("ALERT - PORT SCAN FROM", source_ip)
 
 
 if __name__ == "__main__":
+    connect()
     sniffer = AsyncSniffer(prn=analyze)
     sniffer.start()
     time.sleep(10)
     sniffer.stop()
+    dissconnect()
