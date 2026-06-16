@@ -19,7 +19,7 @@ def analyze(packet):
     if not (packet.haslayer(IP) and packet.haslayer(TCP)):
         return
     
-    if packet[TCP].flags == "S": ## SYN spam detectio
+    if packet[TCP].flags == "S": ## SYN spam detection
         source_ip = packet[IP].src
         timestamp = packet.time
         dport = packet[TCP].dport
