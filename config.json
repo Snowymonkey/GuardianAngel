@@ -1,3 +1,4 @@
 {
-    "syn_threshold" : 10
+    "syn_threshold" : 10,
+    "ssh_threshold" : 100
 }
