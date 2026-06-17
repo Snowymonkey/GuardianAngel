@@ -85,7 +85,6 @@ if __name__ == "__main__":
         sniffer = AsyncSniffer(prn=analyze)
         sniffer.start()
         print("\n[*] Guardian Angel Active.")
-        time.sleep(10)
 
     except:
         print("\n[*] Stopping Guardian Angel...")
