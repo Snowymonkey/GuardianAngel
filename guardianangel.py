@@ -1,7 +1,7 @@
 import time
-from ssh import connect, dissconnect, execute
 from scapy.all import AsyncSniffer
 from scapy.layers.inet import IP, TCP
+import subprocess
 import json
 
 with open("config.json", "r") as json_file:
@@ -41,7 +41,7 @@ def analyze(packet):
         if len(ip_tracker[source_ip][1]) > syn_threshold and ip_tracker[source_ip][2] == "OPEN":
             print("[!] SYN port scan from", source_ip)
             ip_tracker[source_ip][2] = "BLOCKED"
-            execute(f"sudo iptables -I INPUT 1 -s {source_ip} -j DROP && sudo iptables -L INPUT -n")
+            subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", source_ip, "-j", "DROP"])
             print("[*] Guardian Angel has BLOCKED", source_ip)
 
     if packet[TCP].flags == 0:
@@ -57,7 +57,7 @@ def analyze(packet):
             ip_tracker[source_ip] = [timestamp, {dport}, "BLOCKED"]
         
         print("[!] Null port scan from", source_ip)
-        execute(f"sudo iptables -I INPUT 1 -s {source_ip} -j DROP && sudo iptables -L INPUT -n")
+        subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", source_ip, "-j", "DROP"])
         print("[*] Guardian Angel has BLOCKED", source_ip)
 
     if packet[TCP].flags == "FPU":
@@ -74,7 +74,7 @@ def analyze(packet):
         
         print("[!] Xmas port scan from", source_ip)
         print(f"[*] Configuring firewall to BLOCK {source_ip}...")
-        execute(f"sudo iptables -I INPUT 1 -s {source_ip} -j DROP && sudo iptables -L INPUT -n")
+        subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", source_ip, "-j", "DROP"])
         print(f"[*] Guardian Angel has BLOCKED {source_ip}") 
         
 
@@ -82,7 +82,6 @@ def analyze(packet):
 
 if __name__ == "__main__":
     try:
-        # connect()
         sniffer = AsyncSniffer(prn=analyze)
         sniffer.start()
         print("\n[*] Guardian Angel Active.")
@@ -93,4 +92,3 @@ if __name__ == "__main__":
 
     finally:
         sniffer.stop()
-        # dissconnect()
