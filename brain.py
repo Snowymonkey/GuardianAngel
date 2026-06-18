@@ -1,18 +1,11 @@
-"""This will later be the argument parser"""
-
-import time
-from scapy.all import AsyncSniffer
-from scapy.layers.inet import IP, TCP
-import subprocess
 import json
+from scapy.layers.inet import IP, TCP
+from enforcer import block
 
 with open("config.json", "r") as json_file:
     data = json.load(json_file)
     syn_threshold = data["syn_threshold"]
     ssh_threshold = data["ssh_threshold"]
-
-block_ip = "sudo iptables -I INPUT 1 -s 1.1.1.1 -j DROP"
-one_liner = "sudo iptables -I INPUT 1 -s 1.1.1.1 -j DROP && sudo iptables -L INPUT -n"
 
 ip_tracker = {
     # "1.1.1.1" : {
@@ -28,12 +21,6 @@ def create_ip_tracker():
         "ssh" : {"time" : None, "attempts" : 0},
         "status" : "OPEN"
     }
-
-def block(ip):
-    print(f"[*] Configuring firewall to BLOCK {ip}...")
-    ip_tracker[ip]["status"] = "BLOCKED"
-    # subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", ip, "-j", "DROP"])
-    print("[*] Guardian Angel has BLOCKED", ip)
 
 def analyze(packet):
     
@@ -66,6 +53,7 @@ def analyze(packet):
         
         if ip_tracker[source_ip]["ssh"]["attempts"] > ssh_threshold:
             print("[!] SSH brute force from", source_ip)
+            ip_tracker[source_ip]["status"] = "BLOCKED"
             block(source_ip)
 
     elif packet[TCP].flags == "S": ## SYN spam detection
@@ -93,6 +81,7 @@ def analyze(packet):
         
         if len(ip_tracker[source_ip]["syn"]["ports"]) > syn_threshold:
             print("[!] SYN port scan from", source_ip)
+            ip_tracker[source_ip]["status"] = "BLOCKED"
             block(source_ip)
 
 
@@ -108,6 +97,7 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Null port scan from", source_ip)
+        ip_tracker[source_ip]["status"] = "BLOCKED"
         block(source_ip)
 
     elif packet[TCP].flags == "FPU": ## Xmas Scan Detection
@@ -123,20 +113,5 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Xmas port scan from", source_ip)
+        ip_tracker[source_ip]["status"] = "BLOCKED"
         block(source_ip)
-    
-
-
-if __name__ == "__main__":
-    try:
-        sniffer = AsyncSniffer(prn=analyze)
-        sniffer.start()
-        print("\n[*] Guardian Angel Active.")
-        while True:
-            time.sleep(1)
-
-    except KeyboardInterrupt:
-        print("\n[*] Stopping Guardian Angel...")
-
-    finally:
-        sniffer.stop()
