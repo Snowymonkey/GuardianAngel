@@ -1,11 +1,19 @@
 import json
+import datetime
+import threading
+import socket
 from scapy.layers.inet import IP, TCP
-from enforcer import block
+from enforcer import block, unblock
 
 with open("config.json", "r") as json_file:
     data = json.load(json_file)
     syn_threshold = data["syn_threshold"]
     ssh_threshold = data["ssh_threshold"]
+    block_time = data["block_time"]
+
+udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket
+udp_socket.bind(("127.0.0.1", 5005))
+
 
 ip_tracker = {
     # "1.1.1.1" : {
@@ -21,6 +29,22 @@ def create_ip_tracker():
         "ssh" : {"time" : None, "attempts" : 0},
         "status" : "OPEN"
     }
+    
+def schedule_unblock(ip):
+    ip_tracker[ip]["status"] = "OPEN"
+    unblock(ip)
+    write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
+
+def write_log(ip, action, reason):
+    log = {"time" : str(datetime.datetime.now()),
+        "ip" : ip,
+        "action" : action,
+        "reason" : reason
+        }
+    
+    with open("guardian_angel.log", "a") as file:
+        file.write(json.dumps(log) + "\n")
+        
 
 def analyze(packet):
     
@@ -53,8 +77,11 @@ def analyze(packet):
         
         if ip_tracker[source_ip]["ssh"]["attempts"] > ssh_threshold:
             print("[!] SSH brute force from", source_ip)
+            block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
+            block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
             block(source_ip)
+            write_log(source_ip, "BLOCKED", "SSH Brute Force")
 
     elif packet[TCP].flags == "S": ## SYN spam detection
         source_ip = packet[IP].src
@@ -81,8 +108,11 @@ def analyze(packet):
         
         if len(ip_tracker[source_ip]["syn"]["ports"]) > syn_threshold:
             print("[!] SYN port scan from", source_ip)
+            block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
+            block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
             block(source_ip)
+            write_log(source_ip, "BLOCKED", "SYN Port Scan")
 
 
     elif packet[TCP].flags == 0: ## Null Scan Detection
@@ -97,8 +127,11 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Null port scan from", source_ip)
+        block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
+        block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
         block(source_ip)
+        write_log(source_ip, "BLOCKED", "Null Port Scan")
 
     elif packet[TCP].flags == "FPU": ## Xmas Scan Detection
 
@@ -113,5 +146,12 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Xmas port scan from", source_ip)
+        block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
+        block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
         block(source_ip)
+        write_log(source_ip, "BLOCKED", "Xmas Port Scan")
+
+while True:
+    data, address = udp_socket.recvfrom(1024)
+    print(data)
