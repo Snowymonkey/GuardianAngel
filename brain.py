@@ -11,9 +11,12 @@ with open("config.json", "r") as json_file:
     ssh_threshold = data["ssh_threshold"]
     block_time = data["block_time"]
 
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket
-udp_socket.bind(("127.0.0.1", 5005))
+listening_port = 5005
 
+udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket
+udp_socket.bind(("127.0.0.1", listening_port)) ## Listening Port
+
+tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 ip_tracker = {
     # "1.1.1.1" : {
@@ -44,18 +47,18 @@ def write_log(ip, action, reason):
     
     with open("guardian_angel.log", "a") as file:
         file.write(json.dumps(log) + "\n")
-        
 
 def analyze(packet):
-    
-    if not (packet.haslayer(IP) and packet.haslayer(TCP)):
+    #print(packet)
+
+    if not (packet["source_ip"]):
         return
     
-    if packet[TCP] and packet[TCP].dport == 22: ## SSH Scan detection
+    if packet["protocol_type"] == "TCP" and packet["dport"] == 22: ## SSH Scan detection
 
-        source_ip = packet[IP].src
-        timestamp = packet.time
-        dport = packet[TCP].dport
+        source_ip = packet["source_ip"]
+        timestamp = packet["time"]
+        dport = packet["dport"]
 
         if source_ip in ip_tracker and ip_tracker[source_ip]["status"] == "BLOCKED":
             return
@@ -83,10 +86,10 @@ def analyze(packet):
             block(source_ip)
             write_log(source_ip, "BLOCKED", "SSH Brute Force")
 
-    elif packet[TCP].flags == "S": ## SYN spam detection
-        source_ip = packet[IP].src
-        timestamp = packet.time
-        dport = packet[TCP].dport
+    elif packet["flags"] == "S": ## SYN spam detection
+        source_ip = packet["source_ip"]
+        timestamp = packet["time"]
+        dport = packet["dport"]
 
         if source_ip in ip_tracker and ip_tracker[source_ip]["status"] == "BLOCKED":
             return
@@ -111,14 +114,22 @@ def analyze(packet):
             block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
-            block(source_ip)
+            print("Connecting to IP")
+            tcp_socket.connect(("127.0.0.1", 5006))
+            block_info = {"source_ip" : source_ip, "action" : "BLOCKED", "reason" : "SYN Port Scan"}
+            block_info = json.dumps(block_info)
+            block_info = block_info.encode("utf-8")
+            print("Sending info")
+            tcp_socket.sendall(block_info)
+            tcp_socket.close()
+            # block(source_ip)
             write_log(source_ip, "BLOCKED", "SYN Port Scan")
 
 
-    elif packet[TCP].flags == 0: ## Null Scan Detection
-        source_ip = packet[IP].src
-        timestamp = packet.time
-        dport = packet[TCP].dport
+    elif packet["flags"] == 0: ## Null Scan Detection
+        source_ip = packet["source_ip"]
+        timestamp = packet["time"]
+        dport = packet["dport"]
 
         if source_ip in ip_tracker and ip_tracker[source_ip]["status"] == "BLOCKED":
             return
@@ -133,11 +144,11 @@ def analyze(packet):
         block(source_ip)
         write_log(source_ip, "BLOCKED", "Null Port Scan")
 
-    elif packet[TCP].flags == "FPU": ## Xmas Scan Detection
+    elif packet["flags"] == "FPU": ## Xmas Scan Detection
 
-        source_ip = packet[IP].src
-        timestamp = packet.time
-        dport = packet[TCP].dport
+        source_ip = packet["source_ip"]
+        timestamp = packet["time"]
+        dport = packet["dport"]
 
         if source_ip in ip_tracker and ip_tracker[source_ip]["status"] == "BLOCKED":
             return
@@ -152,6 +163,22 @@ def analyze(packet):
         block(source_ip)
         write_log(source_ip, "BLOCKED", "Xmas Port Scan")
 
-while True:
-    data, address = udp_socket.recvfrom(1024)
-    print(data)
+
+if __name__ == "__main__":
+    print("\n[*] The Guardian Heart is Active.")
+    while True:
+        try:
+            data, address = udp_socket.recvfrom(1024)
+
+            json_string = data.decode("utf-8")
+            packet_info = json.loads(json_string)
+            
+            analyze(packet_info)
+        except KeyboardInterrupt:
+            print("\n[*] Stopping The Guardian Heart...")
+            udp_socket.close()
+            break
+
+        except:
+            print("[?] Error Reading Packet")
+        
