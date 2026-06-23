@@ -3,7 +3,7 @@ import datetime
 import threading
 import socket
 from scapy.layers.inet import IP, TCP
-from enforcer import block, unblock
+# from enforcer import block, unblock
 
 with open("config.json", "r") as json_file:
     data = json.load(json_file)
@@ -35,7 +35,7 @@ def create_ip_tracker():
     
 def schedule_unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
-    unblock(ip)
+    # unblock(ip)
     write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
 
 def write_log(ip, action, reason):
@@ -47,6 +47,23 @@ def write_log(ip, action, reason):
     
     with open("guardian_angel.log", "a") as file:
         file.write(json.dumps(log) + "\n")
+
+# {"source_ip" : source_ip, "action" : "BLOCKED", "reason" : "SYN Port Scan"}
+def send_to_enforcer(ip, action, reason):
+    tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print("Connecting to IP")
+    tcp_socket.connect(("127.0.0.1", 5006))
+    block_info = json.dumps({"source_ip" : ip, "action" : action, "reason" : reason})
+    block_info = block_info.encode("utf-8")
+    print("Sending info")
+    try:
+        tcp_socket.sendall(block_info)
+    except:
+        print("Error sending packet")
+    
+    tcp_socket.close()
+
+
 
 def analyze(packet):
     #print(packet)
@@ -83,7 +100,7 @@ def analyze(packet):
             block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
-            block(source_ip)
+            # block(source_ip)
             write_log(source_ip, "BLOCKED", "SSH Brute Force")
 
     elif packet["flags"] == "S": ## SYN spam detection
@@ -114,14 +131,7 @@ def analyze(packet):
             block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
-            print("Connecting to IP")
-            tcp_socket.connect(("127.0.0.1", 5006))
-            block_info = {"source_ip" : source_ip, "action" : "BLOCKED", "reason" : "SYN Port Scan"}
-            block_info = json.dumps(block_info)
-            block_info = block_info.encode("utf-8")
-            print("Sending info")
-            tcp_socket.sendall(block_info)
-            tcp_socket.close()
+            send_to_enforcer(source_ip, "BLOCK", "SYN Port Scan")
             # block(source_ip)
             write_log(source_ip, "BLOCKED", "SYN Port Scan")
 
@@ -141,7 +151,7 @@ def analyze(packet):
         block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
-        block(source_ip)
+        # block(source_ip)
         write_log(source_ip, "BLOCKED", "Null Port Scan")
 
     elif packet["flags"] == "FPU": ## Xmas Scan Detection
@@ -160,7 +170,7 @@ def analyze(packet):
         block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
-        block(source_ip)
+        # block(source_ip)
         write_log(source_ip, "BLOCKED", "Xmas Port Scan")
 
 
@@ -178,7 +188,4 @@ if __name__ == "__main__":
             print("\n[*] Stopping The Guardian Heart...")
             udp_socket.close()
             break
-
-        except:
-            print("[?] Error Reading Packet")
         

@@ -1,7 +1,9 @@
 import subprocess
+import json
 import socket
 
 tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+tcp_socket.bind(("127.0.0.1", 5006))
 
 def block(ip):
     print(f"[*] Configuring firewall to BLOCK {ip}...")
@@ -14,13 +16,18 @@ def unblock(ip):
     print("[*] Guardian Angel has UNBLOCKED", ip)
 
 if __name__ == "__main__":
+    tcp_socket.listen(5)
+    print("\n[*] Guardian Enforcer Started.")
     while True:
         try:
-            tcp_socket.listen(5)
             client_socket, source_ip = tcp_socket.accept()
 
-            print(source_ip)
-
             data = client_socket.recv(1024)
-        except:
-            print("[?] Error Listening for Packets")
+
+            if data:
+                data = data.decode('utf-8')
+                data = json.loads(data)
+                print(data)
+        except KeyboardInterrupt:
+            print("]\n[*] Stopping Guardian Enforcer...")
+    

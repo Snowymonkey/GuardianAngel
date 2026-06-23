@@ -1,6 +1,0 @@
-{"time": "2026-06-21 11:45:53.800834", "ip": "127.0.0.1", "action": "BLOCKED", "reason": "SYN Port Scan"}
-{"time": "2026-06-21 11:45:58.805988", "ip": "127.0.0.1", "action": "UNBLOCKED", "reason": "Blocked Timer Complete"}
-{"time": "2026-06-21 21:07:56.171546", "ip": "127.0.0.1", "action": "UNBLOCKED", "reason": "Blocked Timer Complete"}
-{"time": "2026-06-21 21:08:59.588059", "ip": "127.0.0.1", "action": "UNBLOCKED", "reason": "Blocked Timer Complete"}
-{"time": "2026-06-21 21:09:44.608728", "ip": "127.0.0.1", "action": "UNBLOCKED", "reason": "Blocked Timer Complete"}
-{"time": "2026-06-21 21:10:58.092632", "ip": "127.0.0.1", "action": "UNBLOCKED", "reason": "Blocked Timer Complete"}
