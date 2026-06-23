@@ -11,10 +11,15 @@ with open("config.json", "r") as json_file:
     ssh_threshold = data["ssh_threshold"]
     block_time = data["block_time"]
 
-listening_port = 5005
+    sensor_ip = data["sensor_ip"]
+    analyzer_ip = data["analyzer_ip"]
+    enforcer_ip = data["enforcer_ip"]
 
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket
-udp_socket.bind(("127.0.0.1", listening_port)) ## Listening Port
+    analyzer_port = data["analyzer_port"]
+    enforcer_port = data["enforcer_port"]
+
+udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udp_socket.bind(("192.168.68.88", analyzer_port)) ## Listening Port (sensor -> analyzer)
 
 tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -35,8 +40,8 @@ def create_ip_tracker():
     
 def schedule_unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
-    # unblock(ip)
-    write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
+    send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
+    # write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
 
 def write_log(ip, action, reason):
     log = {"time" : str(datetime.datetime.now()),
@@ -48,14 +53,14 @@ def write_log(ip, action, reason):
     with open("guardian_angel.log", "a") as file:
         file.write(json.dumps(log) + "\n")
 
-# {"source_ip" : source_ip, "action" : "BLOCKED", "reason" : "SYN Port Scan"}
 def send_to_enforcer(ip, action, reason):
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print("Connecting to IP")
-    tcp_socket.connect(("127.0.0.1", 5006))
+
+    tcp_socket.connect((enforcer_ip, enforcer_port))
+
     block_info = json.dumps({"source_ip" : ip, "action" : action, "reason" : reason})
     block_info = block_info.encode("utf-8")
-    print("Sending info")
+
     try:
         tcp_socket.sendall(block_info)
     except:
@@ -100,8 +105,8 @@ def analyze(packet):
             block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
-            # block(source_ip)
-            write_log(source_ip, "BLOCKED", "SSH Brute Force")
+            send_to_enforcer(source_ip, "BLOCK", "SSH Brute Force")
+            # write_log(source_ip, "BLOCKED", "SSH Brute Force")
 
     elif packet["flags"] == "S": ## SYN spam detection
         source_ip = packet["source_ip"]
@@ -132,8 +137,7 @@ def analyze(packet):
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
             send_to_enforcer(source_ip, "BLOCK", "SYN Port Scan")
-            # block(source_ip)
-            write_log(source_ip, "BLOCKED", "SYN Port Scan")
+            # write_log(source_ip, "BLOCKED", "SYN Port Scan")
 
 
     elif packet["flags"] == 0: ## Null Scan Detection
@@ -151,8 +155,8 @@ def analyze(packet):
         block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
-        # block(source_ip)
-        write_log(source_ip, "BLOCKED", "Null Port Scan")
+        send_to_enforcer(source_ip, "BLOCK", "Null Port Scan")
+        # write_log(source_ip, "BLOCKED", "Null Port Scan")
 
     elif packet["flags"] == "FPU": ## Xmas Scan Detection
 
@@ -170,22 +174,26 @@ def analyze(packet):
         block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
-        # block(source_ip)
+        send_to_enforcer(source_ip, "BLOCK", "Xmas Port Scan")
         write_log(source_ip, "BLOCKED", "Xmas Port Scan")
 
 
 if __name__ == "__main__":
-    print("\n[*] The Guardian Heart is Active.")
+    print("\n[*] The Guardian Analyzer is Active.")
     while True:
         try:
-            data, address = udp_socket.recvfrom(1024)
+            data, ip_address = udp_socket.recvfrom(1024)
 
             json_string = data.decode("utf-8")
             packet_info = json.loads(json_string)
+
+            if ip_address[0] is not sensor_ip:
+                print(f"Recieved Packets from unrecognized IP: {ip_address[0]}")
+                continue
             
             analyze(packet_info)
         except KeyboardInterrupt:
-            print("\n[*] Stopping The Guardian Heart...")
+            print("\n[*] Stopping The Guardian Analyzer...")
             udp_socket.close()
             break
         

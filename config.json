@@ -1,5 +1,14 @@
 {
     "syn_threshold" : 10,
     "block_time" : 5,
-    "ssh_threshold" : 100
+    "ssh_threshold" : 100,
+
+    "sensor_ip" : "localhost",
+    "analyzer_ip" : "localhost",
+    "enforcer_ip" : "localhost",
+
+    "analyzer_port" : 5005,
+    "enforcer_port" : 5006,
+
+    "network_interface" : "en0"
 }

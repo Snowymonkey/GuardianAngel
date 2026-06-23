@@ -4,9 +4,18 @@ import json
 from scapy.all import AsyncSniffer
 from scapy.layers.inet import IP, TCP, UDP
 
-brain_ip = "127.0.0.1"
+with open("config.json", "r") as file:
+    data = json.load(file)
+    sensor_ip = data["sensor_ip"]
+    analyzer_ip = data["analyzer_ip"]
+    enforcer_ip = data["enforcer_ip"]
 
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket
+    analyzer_port = data["analyzer_port"]
+
+    network_interface = data["network_interface"]
+
+
+udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket (sensor -> analyzer)
 
 def send_packet(packet):
     packet_info = {
@@ -39,25 +48,23 @@ def send_packet(packet):
         packet_info["dport"] = None
         packet_info["flags"] = None
     
-
-    if (packet_info["dport"] is not None) and (packet_info["dport"] != 5005):
-        
+    if packet_info["dport"] is not None:      
 
         packet_info = json.dumps(packet_info).encode("utf-8")
 
-        udp_socket.sendto(packet_info, ("127.0.0.1", 5005))
+        udp_socket.sendto(packet_info, (analyzer_ip, analyzer_port))
 
 
 if __name__ == "__main__":
     try:
-        sniffer = AsyncSniffer(prn=send_packet, iface="lo0")
+        sniffer = AsyncSniffer(prn=send_packet, iface=network_interface)
         sniffer.start()
-        print("\n[*] The Guardian Eyes Are Active.")
+        print("\n[*] The Guardian Sensor is Active.")
         while True:
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\n[*] Stopping The Guardian Eyes...")
+        print("\n[*] Stopping the Guardian Sensor...")
 
     finally:
         sniffer.stop()
