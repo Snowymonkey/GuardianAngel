@@ -1,6 +1,7 @@
 import json
-import datetime
 import threading
+import hmac
+from hashlib import sha256
 import socket
 from scapy.layers.inet import IP, TCP
 # from enforcer import block, unblock
@@ -18,8 +19,10 @@ with open("config.json", "r") as json_file:
     analyzer_port = data["analyzer_port"]
     enforcer_port = data["enforcer_port"]
 
+    hmac_key = data["hmac_key"].encode("utf-8") ## Needs to be encoded to be used for HMAC key
+
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_socket.bind(("192.168.68.88", analyzer_port)) ## Listening Port (sensor -> analyzer)
+udp_socket.bind((analyzer_ip, analyzer_port)) ## Listening Port (sensor -> analyzer)
 
 tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -43,37 +46,47 @@ def schedule_unblock(ip):
     send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
     # write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
 
-def write_log(ip, action, reason):
-    log = {"time" : str(datetime.datetime.now()),
-        "ip" : ip,
-        "action" : action,
-        "reason" : reason
-        }
+# def write_log(ip, action, reason):
+#     log = {"time" : str(datetime.datetime.now()),
+#         "ip" : ip,
+#         "action" : action,
+#         "reason" : reason
+#         }
     
-    with open("guardian_angel.log", "a") as file:
-        file.write(json.dumps(log) + "\n")
+#     with open("guardian_angel.log", "a") as file:
+#         file.write(json.dumps(log) + "\n")
+
+def check_signature(payload, signature):
+    message = json.dumps(payload)
+    checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
+    return hmac.compare_digest(checksum.hexdigest(), signature)
+
+
 
 def send_to_enforcer(ip, action, reason):
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    tcp_socket.connect((enforcer_ip, enforcer_port))
-
-    block_info = json.dumps({"source_ip" : ip, "action" : action, "reason" : reason})
-    block_info = block_info.encode("utf-8")
-
     try:
-        tcp_socket.sendall(block_info)
+        tcp_socket.connect((enforcer_ip, enforcer_port))
+
+        block_info = json.dumps({"source_ip" : ip, "action" : action, "reason" : reason})
+        block_info = block_info.encode("utf-8")
+
+        try:
+            tcp_socket.sendall(block_info)
+        except:
+            print("[?] Error sending packet")
+
     except:
-        print("Error sending packet")
+        print("[?] Enforcer Connection Not Made")
     
     tcp_socket.close()
-
 
 
 def analyze(packet):
     #print(packet)
 
-    if not (packet["source_ip"]):
+    if not (packet["source_ip"] or packet["protocol_type"]):
         return
     
     if packet["protocol_type"] == "TCP" and packet["dport"] == 22: ## SSH Scan detection
@@ -175,7 +188,7 @@ def analyze(packet):
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
         send_to_enforcer(source_ip, "BLOCK", "Xmas Port Scan")
-        write_log(source_ip, "BLOCKED", "Xmas Port Scan")
+        # write_log(source_ip, "BLOCKED", "Xmas Port Scan")
 
 
 if __name__ == "__main__":
@@ -184,14 +197,28 @@ if __name__ == "__main__":
         try:
             data, ip_address = udp_socket.recvfrom(1024)
 
-            json_string = data.decode("utf-8")
-            packet_info = json.loads(json_string)
-
             if ip_address[0] != sensor_ip:
-                print(f"Recieved Packets from unrecognized IP: {ip_address[0]}")
+                print(f"[?] Recieved Packets from unrecognized IP: {ip_address[0]}")
                 continue
-            
-            analyze(packet_info)
+
+            try:
+                json_string = data.decode("utf-8")
+                packet_info = json.loads(json_string)
+                try:
+                    payload = packet_info["payload"]
+                    signature = packet_info["signature"]
+                except:
+                    print("[?] Malformed Packet")
+                    continue
+            except:
+                print("[?] Error Decoding Bytes or JSON")
+                continue
+
+            if check_signature(packet_info["payload"], packet_info["signature"]):
+                analyze(packet_info["payload"])
+            else:
+                print("[?] Invalid Checksum")
+
         except KeyboardInterrupt:
             print("\n[*] Stopping The Guardian Analyzer...")
             udp_socket.close()

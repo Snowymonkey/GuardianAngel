@@ -3,12 +3,14 @@
     "block_time" : 5,
     "ssh_threshold" : 100,
 
-    "sensor_ip" : "localhost",
-    "analyzer_ip" : "localhost",
-    "enforcer_ip" : "localhost",
+    "sensor_ip" : "192.168.68.87",
+    "analyzer_ip" : "192.168.68.88",
+    "enforcer_ip" : "127.0.0.1",
 
     "analyzer_port" : 5005,
     "enforcer_port" : 5006,
 
-    "network_interface" : "en0"
+    "network_interface" : "en0",
+
+    "hmac_key" : "REPLACE_ME"
 }
