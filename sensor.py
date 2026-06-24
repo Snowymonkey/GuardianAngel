@@ -17,7 +17,7 @@ with open("config.json", "r") as file:
 
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) ## Creates the UDP socket (sensor -> analyzer)
 
-def calculate_hmac_hexdigest(packet_info):
+def calculate_hmac(packet_info):
     message = json.dumps(packet_info)
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return checksum.hexdigest()
@@ -59,7 +59,7 @@ def send_packet(packet):
     
     if packet_info["payload"]["dport"] is not None:      
         
-        packet_info["signature"] = calculate_hmac_hexdigest(packet_info["payload"])
+        packet_info["signature"] = calculate_hmac(packet_info["payload"])
         print(packet_info)
         packet_info = json.dumps(packet_info).encode("utf-8")
 

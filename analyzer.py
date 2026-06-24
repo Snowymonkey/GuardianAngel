@@ -61,24 +61,32 @@ def check_signature(payload, signature):
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return hmac.compare_digest(checksum.hexdigest(), signature)
 
-
+def calculate_hmac(packet_info):
+    message = json.dumps(packet_info)
+    checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
+    return checksum.hexdigest()
 
 def send_to_enforcer(ip, action, reason):
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+    payload = {"source_ip" : ip, "action" : action, "reason" : reason}
+    signature = calculate_hmac(payload)
+
+    envelope = {
+        "payload" : payload,
+        "signature" : signature
+    }
+
+    packet = json.dumps(envelope).encode("utf-8")
+
     try:
         tcp_socket.connect((enforcer_ip, enforcer_port))
+        tcp_socket.sendall(packet)
 
-        block_info = json.dumps({"source_ip" : ip, "action" : action, "reason" : reason})
-        block_info = block_info.encode("utf-8")
-
-        try:
-            tcp_socket.sendall(block_info)
-        except:
-            print("[?] Error sending packet")
-
-    except:
-        print("[?] Enforcer Connection Not Made")
+    except ConnectionRefusedError:
+        print("[?] Enforcer Offline or Refused Connection")
+    except Exception as error:
+        print(f"[?] Unexpected Error: {error}")
     
     tcp_socket.close()
 
@@ -86,7 +94,7 @@ def send_to_enforcer(ip, action, reason):
 def analyze(packet):
     #print(packet)
 
-    if not (packet["source_ip"] or packet["protocol_type"]):
+    if not (packet["source_ip"] or packet["protocol_type"] or packet["time"]):
         return
     
     if packet["protocol_type"] == "TCP" and packet["dport"] == 22: ## SSH Scan detection
@@ -214,8 +222,8 @@ if __name__ == "__main__":
                 print("[?] Error Decoding Bytes or JSON")
                 continue
 
-            if check_signature(packet_info["payload"], packet_info["signature"]):
-                analyze(packet_info["payload"])
+            if check_signature(payload, signature):
+                analyze(payload)
             else:
                 print("[?] Invalid Checksum")
 
