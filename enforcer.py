@@ -41,6 +41,13 @@ if __name__ == "__main__":
         try:
             client_socket, source_ip = tcp_socket.accept()
 
+            print(source_ip[0])
+
+            if source_ip[0] != analyzer_ip:
+                print(f"Recieved Packets from unrecognized IP: {source_ip[0]}")
+                continue
+
+
             data = client_socket.recv(1024)
 
             if data:

@@ -187,7 +187,7 @@ if __name__ == "__main__":
             json_string = data.decode("utf-8")
             packet_info = json.loads(json_string)
 
-            if ip_address[0] is not sensor_ip:
+            if ip_address[0] != sensor_ip:
                 print(f"Recieved Packets from unrecognized IP: {ip_address[0]}")
                 continue
             
