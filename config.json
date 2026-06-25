@@ -1,6 +1,7 @@
 {
     "syn_threshold": 10,
     "block_time": 5,
+    "dynamic_block_time" : false,
     "ssh_threshold": 100,
     "sensor_ip": "127.0.0.1",
     "analyzer_ip": "127.0.0.1",

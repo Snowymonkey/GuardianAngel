@@ -41,7 +41,7 @@ def unblock(ip):
     # subprocess.run(["sudo", "iptables", "-D", "FORWARD", "-s", ip, "-j", "DROP"])
     print("[*] Guardian Angel has UNBLOCKED", ip)
 
-def execute(payload): ## IMPLEMENT
+def execute(payload): 
     if payload["action"] == "BLOCK":
         block(payload["source_ip"])
 
@@ -85,4 +85,7 @@ if __name__ == "__main__":
                     print("[?] Invalid Checksum")
         except KeyboardInterrupt:
             print("]\n[*] Stopping the Guardian Enforcer...")
+            tcp_socket.close()
             break
+        except Exception as error:
+            print(f"\n[?] Unexpected error {error}")

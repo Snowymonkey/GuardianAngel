@@ -57,7 +57,6 @@ def send_packet(packet):
     
     if packet_info["payload"]["dport"] is not None and packet_info["payload"]["dport"] != 5005:
         packet_info["signature"] = calculate_hmac(packet_info["payload"])
-        print(packet_info)
         packet_info = json.dumps(packet_info).encode("utf-8")
 
         udp_socket.sendto(packet_info, (analyzer_ip, analyzer_port))
@@ -79,3 +78,4 @@ if __name__ == "__main__":
 
     finally:
         sniffer.stop()
+        udp_socket.close()

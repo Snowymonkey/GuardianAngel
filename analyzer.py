@@ -10,14 +10,12 @@ with open("config.json", "r") as json_file:
     syn_threshold = data["syn_threshold"]
     ssh_threshold = data["ssh_threshold"]
     block_time = data["block_time"]
-
+    dynamic_block_time = data["dynamic_block_time"]
     sensor_ip = data["sensor_ip"]
     analyzer_ip = data["analyzer_ip"]
     enforcer_ip = data["enforcer_ip"]
-
     analyzer_port = data["analyzer_port"]
     enforcer_port = data["enforcer_port"]
-
     hmac_key = data["hmac_key"].encode("utf-8") ## Needs to be encoded to be used for HMAC key
 
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -37,8 +35,21 @@ def create_ip_tracker():
     return {
         "syn" : {"time" : None, "ports" : set()},
         "ssh" : {"time" : None, "attempts" : 0},
-        "status" : "OPEN"
+        "status" : "OPEN",
+        "total_blocks" : 0
     }
+
+def execute_block(ip, reason):
+    ip_tracker[ip]["total_blocks"] += 1
+    if dynamic_block_time:
+        calculated_time = calculate_block_time(ip_tracker[ip]["total_blocks"])
+    else:
+        calculated_time = block_time
+    block_timer = threading.Timer(calculated_time, schedule_unblock, args=[ip])
+    block_timer.start()
+    ip_tracker[ip]["status"] = "BLOCKED"
+    send_to_enforcer(ip, "BLOCK", reason)
+
     
 def schedule_unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
@@ -54,22 +65,25 @@ def calculate_hmac(packet_info):
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return checksum.hexdigest()
 
+def calculate_block_time(total_blocks):
+    return max(block_time * (2 ** (total_blocks-3)), block_time)
+
 def send_to_enforcer(ip, action, reason):
-    tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     payload = {"source_ip" : ip, "action" : action, "reason" : reason}
     signature = calculate_hmac(payload)
 
-    envelope = {
+    packet_info = {
         "payload" : payload,
         "signature" : signature
     }
 
-    packet = json.dumps(envelope).encode("utf-8")
+    packet_bytes = json.dumps(packet_info).encode("utf-8")
 
     try:
-        tcp_socket.connect((enforcer_ip, enforcer_port))
-        tcp_socket.sendall(packet)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp_socket:
+            tcp_socket.connect((enforcer_ip, enforcer_port))
+            tcp_socket.sendall(packet_bytes)
 
     except ConnectionRefusedError:
         print("[?] Enforcer Offline or Refused Connection")
@@ -111,10 +125,7 @@ def analyze(packet):
         
         if ip_tracker[source_ip]["ssh"]["attempts"] > ssh_threshold:
             print("[!] SSH brute force from", source_ip)
-            block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
-            block_timer.start()
-            ip_tracker[source_ip]["status"] = "BLOCKED"
-            send_to_enforcer(source_ip, "BLOCK", "SSH Brute Force")
+            execute_block(source_ip, "SSH Brute Force")
 
     elif packet["flags"] == "S": ## SYN spam detection
         source_ip = packet["source_ip"]
@@ -141,10 +152,7 @@ def analyze(packet):
         
         if len(ip_tracker[source_ip]["syn"]["ports"]) > syn_threshold:
             print("[!] SYN port scan from", source_ip)
-            block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
-            block_timer.start()
-            ip_tracker[source_ip]["status"] = "BLOCKED"
-            send_to_enforcer(source_ip, "BLOCK", "SYN Port Scan")
+            execute_block(source_ip, "SYN Port Scan")
 
     elif packet["flags"] == 0: ## Null Scan Detection
         source_ip = packet["source_ip"]
@@ -158,10 +166,7 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Null port scan from", source_ip)
-        block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
-        block_timer.start()
-        ip_tracker[source_ip]["status"] = "BLOCKED"
-        send_to_enforcer(source_ip, "BLOCK", "Null Port Scan")
+        execute_block(source_ip, "Null Port Scan")
 
     elif packet["flags"] == "FPU": ## Xmas Scan Detection
 
@@ -176,11 +181,7 @@ def analyze(packet):
             ip_tracker[source_ip] = create_ip_tracker()
         
         print("[!] Xmas port scan from", source_ip)
-        block_timer = threading.Timer(block_time, schedule_unblock, args=[source_ip])
-        block_timer.start()
-        ip_tracker[source_ip]["status"] = "BLOCKED"
-        send_to_enforcer(source_ip, "BLOCK", "Xmas Port Scan")
-
+        execute_block(source_ip, "Xmas Port Scan")
 
 if __name__ == "__main__":
     print("\n[*] The Guardian Analyzer is Active.")
