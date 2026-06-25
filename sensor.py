@@ -76,6 +76,9 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("\n[*] Stopping the Guardian Sensor...")
+    
+    except Exception as error:
+        print(f"[?] Unknown Error: {error}")
 
     finally:
         sniffer.stop()

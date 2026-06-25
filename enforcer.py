@@ -42,7 +42,13 @@ def unblock(ip):
     print("[*] Guardian Angel has UNBLOCKED", ip)
 
 def execute(payload): ## IMPLEMENT
-    print("Executed")
+    if payload["action"] == "BLOCK":
+        block(payload["source_ip"])
+
+    elif payload["action"] == "UNBLOCK":
+        unblock(payload["source_ip"])
+    
+    write_log(payload["source_ip"], payload["action"], payload["reason"])
 
 if __name__ == "__main__":
     tcp_socket.listen(5)
@@ -55,7 +61,6 @@ if __name__ == "__main__":
                 print(f"[?] Recieved Packets from unrecognized IP: {source_ip[0]}")
                 continue
 
-
             data = client_socket.recv(1024)
 
             if data:
@@ -65,11 +70,13 @@ if __name__ == "__main__":
                     try:
                         payload = packet_info["payload"]
                         signature = packet_info["signature"]
-                    except:
+                    except Exception as error:
                         print("[?] Malformed Packet")
+                        print(error)
                         continue
-                except:
+                except Exception as error:
                     print("[?] Error Decoding Bytes or JSON")
+                    print(error)
                     continue
 
                 if check_signature(payload, signature):

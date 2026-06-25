@@ -4,7 +4,6 @@ import hmac
 from hashlib import sha256
 import socket
 from scapy.layers.inet import IP, TCP
-# from enforcer import block, unblock
 
 with open("config.json", "r") as json_file:
     data = json.load(json_file)
@@ -44,17 +43,6 @@ def create_ip_tracker():
 def schedule_unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
     send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
-    # write_log(ip, "UNBLOCKED", "Blocked Timer Complete")
-
-# def write_log(ip, action, reason):
-#     log = {"time" : str(datetime.datetime.now()),
-#         "ip" : ip,
-#         "action" : action,
-#         "reason" : reason
-#         }
-    
-#     with open("guardian_angel.log", "a") as file:
-#         file.write(json.dumps(log) + "\n")
 
 def check_signature(payload, signature):
     message = json.dumps(payload)
@@ -127,7 +115,6 @@ def analyze(packet):
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
             send_to_enforcer(source_ip, "BLOCK", "SSH Brute Force")
-            # write_log(source_ip, "BLOCKED", "SSH Brute Force")
 
     elif packet["flags"] == "S": ## SYN spam detection
         source_ip = packet["source_ip"]
@@ -158,8 +145,6 @@ def analyze(packet):
             block_timer.start()
             ip_tracker[source_ip]["status"] = "BLOCKED"
             send_to_enforcer(source_ip, "BLOCK", "SYN Port Scan")
-            # write_log(source_ip, "BLOCKED", "SYN Port Scan")
-
 
     elif packet["flags"] == 0: ## Null Scan Detection
         source_ip = packet["source_ip"]
@@ -177,7 +162,6 @@ def analyze(packet):
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
         send_to_enforcer(source_ip, "BLOCK", "Null Port Scan")
-        # write_log(source_ip, "BLOCKED", "Null Port Scan")
 
     elif packet["flags"] == "FPU": ## Xmas Scan Detection
 
@@ -196,7 +180,6 @@ def analyze(packet):
         block_timer.start()
         ip_tracker[source_ip]["status"] = "BLOCKED"
         send_to_enforcer(source_ip, "BLOCK", "Xmas Port Scan")
-        # write_log(source_ip, "BLOCKED", "Xmas Port Scan")
 
 
 if __name__ == "__main__":
@@ -215,11 +198,13 @@ if __name__ == "__main__":
                 try:
                     payload = packet_info["payload"]
                     signature = packet_info["signature"]
-                except:
+                except Exception as error:
                     print("[?] Malformed Packet")
+                    print(error)
                     continue
-            except:
-                print("[?] Error Decoding Bytes or JSON")
+            except Exception as error:
+                print("[?] Error Decoding Bytes or Decoding JSON")
+                print(error)
                 continue
 
             if check_signature(payload, signature):
@@ -231,4 +216,3 @@ if __name__ == "__main__":
             print("\n[*] Stopping The Guardian Analyzer...")
             udp_socket.close()
             break
-        
