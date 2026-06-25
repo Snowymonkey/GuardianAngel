@@ -47,18 +47,15 @@ def send_packet(packet):
 
     elif packet.haslayer(UDP):
         packet_info["payload"]["protocol_type"] = "UDP"
-        packet_info["payload"]["dport"] = None
+        packet_info["payload"]["dport"] = packet[UDP].dport
         packet_info["payload"]["flags"] = None
 
     else:
         packet_info["payload"]["protocol_type"] = None
-    
-    if not packet_info["payload"]["protocol_type"]:
         packet_info["payload"]["dport"] = None
         packet_info["payload"]["flags"] = None
     
-    if packet_info["payload"]["dport"] is not None:      
-        
+    if packet_info["payload"]["dport"] is not None and packet_info["payload"]["dport"] != 5005:
         packet_info["signature"] = calculate_hmac(packet_info["payload"])
         print(packet_info)
         packet_info = json.dumps(packet_info).encode("utf-8")

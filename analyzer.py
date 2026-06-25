@@ -208,7 +208,12 @@ if __name__ == "__main__":
                 continue
 
             if check_signature(payload, signature):
-                analyze(payload)
+                try:
+                    payload["source_ip"]
+                    payload["protocol_type"]
+                    analyze(payload)
+                except:
+                    continue
             else:
                 print("[?] Invalid Checksum")
 
