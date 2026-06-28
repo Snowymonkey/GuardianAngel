@@ -42,11 +42,19 @@ block_times = {
 }
 
 timers = {
-    # "1.1.1.1" : "thread object"
+    # "1.1.1.1" : <thread object>
 }
 
-def serialize_and_store():
-    con = sqlite3.connect("test.db") ## ip_tracker serialization
+def create_ip_tracker():
+    return {
+        "syn" : {"time" : None, "ports" : set()},
+        "ssh" : {"time" : None, "attempts" : 0},
+        "status" : "OPEN",
+        "total_blocks" : 0
+    }
+
+def serialize_and_store_dictionaries():
+    con = sqlite3.connect("known_ips.db") ## ip_tracker serialization
     cur = con.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
     cur.execute("""DELETE FROM ip_tracker;""")
@@ -69,7 +77,7 @@ def serialize_and_store():
     con.close()
 
 def load_sql_database():
-    con = sqlite3.connect("test.db")
+    con = sqlite3.connect("known_ips.db")
     cur = con.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
     res = cur.execute("SELECT * FROM ip_tracker")
@@ -84,30 +92,24 @@ def load_sql_database():
     res = res.fetchall()
     for ip, data in res:
         block_times[ip] = json.loads(data)
-    print(block_times)
     con.close()
+    start_block_times_threads()
 
-def create_ip_tracker():
-    return {
-        "syn" : {"time" : None, "ports" : set()},
-        "ssh" : {"time" : None, "attempts" : 0},
-        "status" : "OPEN",
-        "total_blocks" : 0
-    }
-
-def load_sql_blocks():
+def start_block_times_threads():
+    unblocked_ips = []
     for ip in block_times:
         curr_time = datetime.datetime.now().timestamp()
         time_passed = curr_time - block_times[ip]["start_time"]
         if time_passed > block_times[ip]["block_time"]:
-            block_times.pop(ip)
+            unblocked_ips.append(ip)
         else:
             remaining_time = block_times[ip]["block_time"] - time_passed
-            block_timer = threading.Timer(remaining_time, schedule_unblock, args=[ip])
+            block_timer = threading.Timer(remaining_time, unblock, args=[ip])
             block_timer.start()
             timers[ip] = block_timer
-
-    print("SCHEDULED BLOCKS")
+    
+    for ip in unblocked_ips:
+        unblock(ip)
 
 def execute_block(ip, reason):
     ip_tracker[ip]["total_blocks"] += 1
@@ -115,7 +117,7 @@ def execute_block(ip, reason):
         calculated_time = calculate_block_time(ip_tracker[ip]["total_blocks"])
     else:
         calculated_time = block_time
-    block_timer = threading.Timer(calculated_time, schedule_unblock, args=[ip])
+    block_timer = threading.Timer(calculated_time, unblock, args=[ip])
     block_timer.start()
     timers[ip] = block_timer
     block_times[ip] = {"start_time" : datetime.datetime.now().timestamp(), "block_time" : calculated_time}
@@ -123,10 +125,18 @@ def execute_block(ip, reason):
     send_to_enforcer(ip, "BLOCK", reason)
     print(block_times)
     
-def schedule_unblock(ip):
+def unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
-    block_times.pop(ip)
-    timers.pop(ip)
+    try:
+        block_times.pop(ip)
+    except KeyError:
+        pass
+
+    try:
+        timers.pop(ip)
+    except KeyError:
+        pass
+
     send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
 
 def check_signature(payload, signature):
@@ -143,7 +153,6 @@ def calculate_block_time(total_blocks):
     return max(block_time * (2 ** (total_blocks-3)), block_time)
 
 def send_to_enforcer(ip, action, reason):
-
     payload = {"source_ip" : ip, "action" : action, "reason" : reason}
     signature = calculate_hmac(payload)
 
@@ -258,7 +267,6 @@ def analyze(packet):
 
 if __name__ == "__main__":
     load_sql_database()
-    load_sql_blocks()
     print(block_times)
     print("\n[*] The Guardian Analyzer is Active.")
     while True:
@@ -298,7 +306,7 @@ if __name__ == "__main__":
             print("\n[*] Stopping The Guardian Analyzer...")
 
             udp_socket.close()
-            serialize_and_store()
+            serialize_and_store_dictionaries()
 
             for ip in timers:
                 timers[ip].cancel()
