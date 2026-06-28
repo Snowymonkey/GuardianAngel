@@ -1,3 +1,4 @@
+import datetime
 import json
 import threading
 import sqlite3
@@ -33,11 +34,22 @@ ip_tracker = {
     # }
 }
 
-def serialize_and_store(ip_tracker):
-    con = sqlite3.connect("test.db")
+block_times = {
+    # "1.1.1.1" : {"start_time" : 0, "block_time" : 300},
+    # "1.1.1.2" : {"start_time" : 0, "block_time" : 300},
+    # "1.1.1.3" : {"start_time" : 0, "block_time" : 300},
+    # "1.1.1.4" : {"start_time" : 0, "block_time" : 300}
+}
+
+timers = {
+    # "1.1.1.1" : "thread object"
+}
+
+def serialize_and_store():
+    con = sqlite3.connect("test.db") ## ip_tracker serialization
     cur = con.cursor()
-    cur.execute("""DROP TABLE IF EXISTS ip_tracker""")
     cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
+    cur.execute("""DELETE FROM ip_tracker;""")
     for ip in ip_tracker:
         ip_tracker[ip]["syn"]["ports"] = list(ip_tracker[ip]["syn"]["ports"])
         serialized_text = json.dumps(ip_tracker[ip])
@@ -46,18 +58,34 @@ def serialize_and_store(ip_tracker):
     res = cur.execute("SELECT * FROM ip_tracker")
     print(res.fetchall())
 
+    cur.execute("""CREATE TABLE IF NOT EXISTS blocks(ip, blocks)""") ## block_times serialization
+    cur.execute("""DELETE FROM blocks;""")
+    for ip in block_times:
+        serialized_text = json.dumps(block_times[ip])
+        cur.execute("INSERT INTO blocks VALUES (?, ?)", (ip, serialized_text))
+    con.commit()
+    res = cur.execute("SELECT * FROM blocks")
+    print(res.fetchall())
+    con.close()
+
 def load_sql_database():
-    ip_tracker = {}
     con = sqlite3.connect("test.db")
     cur = con.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
     res = cur.execute("SELECT * FROM ip_tracker")
     res = res.fetchall()
-    for i in res:
-        ip_tracker[i[0]] = json.loads(i[1])
-        ip_tracker[i[0]]["syn"]["ports"] = set(ip_tracker[i[0]]["syn"]["ports"])
+    for ip, data in res:
+        ip_tracker[ip] = json.loads(data)
+        ip_tracker[ip]["syn"]["ports"] = set(ip_tracker[ip]["syn"]["ports"])
     print(ip_tracker)
-    return ip_tracker
+
+    cur.execute("""CREATE TABLE IF NOT EXISTS blocks(ip, blocks)""")
+    res = cur.execute("SELECT * FROM blocks")
+    res = res.fetchall()
+    for ip, data in res:
+        block_times[ip] = json.loads(data)
+    print(block_times)
+    con.close()
 
 def create_ip_tracker():
     return {
@@ -67,6 +95,20 @@ def create_ip_tracker():
         "total_blocks" : 0
     }
 
+def load_sql_blocks():
+    for ip in block_times:
+        curr_time = datetime.datetime.now().timestamp()
+        time_passed = curr_time - block_times[ip]["start_time"]
+        if time_passed > block_times[ip]["block_time"]:
+            block_times.pop(ip)
+        else:
+            remaining_time = block_times[ip]["block_time"] - time_passed
+            block_timer = threading.Timer(remaining_time, schedule_unblock, args=[ip])
+            block_timer.start()
+            timers[ip] = block_timer
+
+    print("SCHEDULED BLOCKS")
+
 def execute_block(ip, reason):
     ip_tracker[ip]["total_blocks"] += 1
     if dynamic_block_time:
@@ -75,12 +117,16 @@ def execute_block(ip, reason):
         calculated_time = block_time
     block_timer = threading.Timer(calculated_time, schedule_unblock, args=[ip])
     block_timer.start()
+    timers[ip] = block_timer
+    block_times[ip] = {"start_time" : datetime.datetime.now().timestamp(), "block_time" : calculated_time}
     ip_tracker[ip]["status"] = "BLOCKED"
     send_to_enforcer(ip, "BLOCK", reason)
-
+    print(block_times)
     
 def schedule_unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
+    block_times.pop(ip)
+    timers.pop(ip)
     send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
 
 def check_signature(payload, signature):
@@ -122,7 +168,6 @@ def send_to_enforcer(ip, action, reason):
 
 
 def analyze(packet):
-    #print(packet)
 
     if not (packet["source_ip"] or packet["protocol_type"] or packet["time"]):
         return
@@ -212,10 +257,11 @@ def analyze(packet):
         execute_block(source_ip, "Xmas Port Scan")
 
 if __name__ == "__main__":
-    # ip_tracker = load_sql_database()
+    load_sql_database()
+    load_sql_blocks()
+    print(block_times)
     print("\n[*] The Guardian Analyzer is Active.")
     while True:
-        print("AHH")
         try:
             data, ip_address = udp_socket.recvfrom(1024)
 
@@ -250,7 +296,10 @@ if __name__ == "__main__":
 
         except KeyboardInterrupt:
             print("\n[*] Stopping The Guardian Analyzer...")
+
             udp_socket.close()
-            # serialize_and_store(ip_tracker)
-            print("ALL DONE")
+            serialize_and_store()
+
+            for ip in timers:
+                timers[ip].cancel()
             break
