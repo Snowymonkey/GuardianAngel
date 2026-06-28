@@ -1,5 +1,6 @@
 import json
 import threading
+import sqlite3
 import hmac
 from hashlib import sha256
 import socket
@@ -28,8 +29,35 @@ ip_tracker = {
     #     "syn" : {"time" : 10, "ports" : {23, 20}},
     #     "ssh" : {"time" : 10, "attempts" : 10},
     #     "status" : "OPEN"
+    #     "total_blocks" : 0
     # }
 }
+
+def serialize_and_store(ip_tracker):
+    con = sqlite3.connect("test.db")
+    cur = con.cursor()
+    cur.execute("""DROP TABLE IF EXISTS ip_tracker""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
+    for ip in ip_tracker:
+        ip_tracker[ip]["syn"]["ports"] = list(ip_tracker[ip]["syn"]["ports"])
+        serialized_text = json.dumps(ip_tracker[ip])
+        cur.execute("INSERT INTO ip_tracker VALUES (?, ?)", (ip, serialized_text))
+    con.commit()
+    res = cur.execute("SELECT * FROM ip_tracker")
+    print(res.fetchall())
+
+def load_sql_database():
+    ip_tracker = {}
+    con = sqlite3.connect("test.db")
+    cur = con.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS ip_tracker(ip, tracks)""")
+    res = cur.execute("SELECT * FROM ip_tracker")
+    res = res.fetchall()
+    for i in res:
+        ip_tracker[i[0]] = json.loads(i[1])
+        ip_tracker[i[0]]["syn"]["ports"] = set(ip_tracker[i[0]]["syn"]["ports"])
+    print(ip_tracker)
+    return ip_tracker
 
 def create_ip_tracker():
     return {
@@ -184,8 +212,10 @@ def analyze(packet):
         execute_block(source_ip, "Xmas Port Scan")
 
 if __name__ == "__main__":
+    # ip_tracker = load_sql_database()
     print("\n[*] The Guardian Analyzer is Active.")
     while True:
+        print("AHH")
         try:
             data, ip_address = udp_socket.recvfrom(1024)
 
@@ -221,4 +251,6 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("\n[*] Stopping The Guardian Analyzer...")
             udp_socket.close()
+            # serialize_and_store(ip_tracker)
+            print("ALL DONE")
             break
