@@ -171,7 +171,7 @@ def send_to_enforcer(ip, action, reason):
 
 def analyze(packet):
 
-    if not (packet.get("source_ip") or packet.get("protocol_type") or packet.get("time")):
+    if not (packet.get("source_ip") and packet.get("protocol_type") and packet.get("time")):
         return
     
     if packet["protocol_type"] == "TCP" and packet["dport"] == 22: ## SSH Scan detection
