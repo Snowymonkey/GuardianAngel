@@ -64,7 +64,6 @@ def serialize_and_store_dictionaries():
         cur.execute("INSERT INTO ip_tracker VALUES (?, ?)", (ip, serialized_text))
     con.commit()
     res = cur.execute("SELECT * FROM ip_tracker")
-    print(res.fetchall())
 
     cur.execute("""CREATE TABLE IF NOT EXISTS blocks(ip, blocks)""") ## block_times serialization
     cur.execute("""DELETE FROM blocks;""")
@@ -73,7 +72,6 @@ def serialize_and_store_dictionaries():
         cur.execute("INSERT INTO blocks VALUES (?, ?)", (ip, serialized_text))
     con.commit()
     res = cur.execute("SELECT * FROM blocks")
-    print(res.fetchall())
     con.close()
 
 def load_sql_database():
@@ -85,7 +83,6 @@ def load_sql_database():
     for ip, data in res:
         ip_tracker[ip] = json.loads(data)
         ip_tracker[ip]["syn"]["ports"] = set(ip_tracker[ip]["syn"]["ports"])
-    print(ip_tracker)
 
     cur.execute("""CREATE TABLE IF NOT EXISTS blocks(ip, blocks)""")
     res = cur.execute("SELECT * FROM blocks")
@@ -123,7 +120,6 @@ def execute_block(ip, reason):
     block_times[ip] = {"start_time" : datetime.datetime.now().timestamp(), "block_time" : calculated_time}
     ip_tracker[ip]["status"] = "BLOCKED"
     send_to_enforcer(ip, "BLOCK", reason)
-    print(block_times)
     
 def unblock(ip):
     ip_tracker[ip]["status"] = "OPEN"
@@ -140,12 +136,12 @@ def unblock(ip):
     send_to_enforcer(ip, "UNBLOCK", "Blocked Timer Complete")
 
 def check_signature(payload, signature):
-    message = json.dumps(payload)
+    message = json.dumps(payload, sort_keys=True)
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return hmac.compare_digest(checksum.hexdigest(), signature)
 
 def calculate_hmac(packet_info):
-    message = json.dumps(packet_info)
+    message = json.dumps(packet_info, sort_keys=True)
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return checksum.hexdigest()
 
@@ -161,7 +157,7 @@ def send_to_enforcer(ip, action, reason):
         "signature" : signature
     }
 
-    packet_bytes = json.dumps(packet_info).encode("utf-8")
+    packet_bytes = json.dumps(packet_info, sort_keys=True).encode("utf-8")
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp_socket:
@@ -172,13 +168,10 @@ def send_to_enforcer(ip, action, reason):
         print("[?] Enforcer Offline or Refused Connection")
     except Exception as error:
         print(f"[?] Unexpected Error: {error}")
-    
-    tcp_socket.close()
-
 
 def analyze(packet):
 
-    if not (packet["source_ip"] or packet["protocol_type"] or packet["time"]):
+    if not (packet.get("source_ip") or packet.get("protocol_type") or packet.get("time")):
         return
     
     if packet["protocol_type"] == "TCP" and packet["dport"] == 22: ## SSH Scan detection
@@ -236,7 +229,7 @@ def analyze(packet):
             print("[!] SYN port scan from", source_ip)
             execute_block(source_ip, "SYN Port Scan")
 
-    elif packet["flags"] == 0: ## Null Scan Detection
+    elif packet["flags"] == "0" or packet["flags"] == "": ## Null Scan Detection
         source_ip = packet["source_ip"]
         timestamp = packet["time"]
         dport = packet["dport"]
@@ -293,12 +286,7 @@ if __name__ == "__main__":
                 continue
 
             if check_signature(payload, signature):
-                try:
-                    payload["source_ip"]
-                    payload["protocol_type"]
-                    analyze(payload)
-                except:
-                    continue
+                analyze(payload)
             else:
                 print("[?] Invalid Checksum")
 

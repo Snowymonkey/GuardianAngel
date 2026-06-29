@@ -27,7 +27,7 @@ def write_log(ip, action, reason):
         file.write(json.dumps(log) + "\n")
 
 def check_signature(payload, signature):
-    message = json.dumps(payload)
+    message = json.dumps(payload, sort_keys=True)
     checksum = hmac.new(hmac_key, message.encode("utf-8"), sha256)
     return hmac.compare_digest(checksum.hexdigest(), signature)
 
