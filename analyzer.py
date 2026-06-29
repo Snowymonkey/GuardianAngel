@@ -264,6 +264,7 @@ if __name__ == "__main__":
     print("\n[*] The Guardian Analyzer is Active.")
     while True:
         try:
+
             data, ip_address = udp_socket.recvfrom(1024)
 
             if ip_address[0] != sensor_ip:
