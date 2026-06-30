@@ -88,7 +88,7 @@ To use `Guardian Angel` start the processes in order (sensor.py -> analysis.py -
 | Micro-Service | Description | Requirments |
 |-----------|------------|------------|
 | `sensor.py` | Sniffs packets and sends parsed telemetry data to `analysis.py` | Requires sudo |
-| `analysis.py` | Reads parsed telemtry data from sensor.py and identifies suspicious patterns. When thresholds are reached it will send commands to `enforcer.py` | No privileges |
+| `analysis.py` | Reads parsed telemtry data from `sensor.py` and identifies suspicious patterns. When thresholds are reached it will send commands to `enforcer.py` | No privileges |
 | `enforcer.py` | Writes firewall rules from recieved from `analysis.py` | Requires sudo |
 
 
