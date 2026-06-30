@@ -1,6 +1,6 @@
 # Guardian Angel
 
-`Guardian Angel` is a distributed, multi-tier Intrusion Prevention System (IPS) designed to monitor, detect, and dynamically mitigate network attacks targeting a virtual network environment. Built as a collection of decoupled, highly resilient Python microservices, the system performs real-time traffic analysis, cryptographic validation, SQL-backed state persistence, and programmatic firewall orchestration.
+`Guardian Angel` is a distributed, multi-tier Intrusion Prevention System (IPS) designed to monitor, detect, and dynamically mitigate network attacks targeting a virtual network environment. Built as a collection of decoupled, highly resilient Python microservices, the system performs real-time traffic analysis, cryptographic validation, SQL-backed state persistence, and programmatic firewall orchestration. It was built and tested to be used in defending a Metaploitable 2 VM from a Kali attacker.
 
 ## Features
 
@@ -9,6 +9,32 @@
 * **State Recovery & Persistence**: Employs an active SQLite transaction database to record active blocks. On restart, it automatically calculates remaining cooldown intervals and schedules background unblocks using non-blocking asynchronous timers.
 
 ---
+
+## System Architecture
+
+```text
+Network Architecture Map
+
+        ┌─────────────────────────────────────────────────────────────┐
+        │                        GATEWAY VM                           │
+        │                                                             │
+        │   ┌───────────────┐                  ┌──────────────────┐   │
+        │   │    Sensor     │                  │    Analyzer      │   │
+  Transit   │               │ ────────────────>│                  │   │
+  Traffic ─>│  [sensor.py]  │   HMAC-Signed    │  [analyzer.py]   │   │
+            └───────────────┘    Telemetry     └────────┬─────────┘   │
+                                                        │             │
+                                           HMAC-Signed  │             │
+                                            JSON Cmd    │             │
+                                                        v             │
+                                                        │             │
+            ┌───────────────┐                  ┌────────┴─────────┐   │
+            │   iptables    │<─────────────────│     Enforcer     │   │
+            │  (Firewall)   │  Shell execution │                  │   │
+            └───────────────┘                  │  [enforcer.py]   │   │
+                                               └──────────────────┘   │
+        └─────────────────────────────────────────────────────────────┘
+```
 
 ## Installation
 
