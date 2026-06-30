@@ -81,6 +81,17 @@ python3 generate-key.py
 
 For a simple 1 Kali attacker set up, I recommend the `syn_threshold` to be set to 10 and the ssh_`threshold` to be set to 100.
 
+## Usage
+
+To use `Guardian Angel` start the processes in order (sensor.py -> analysis.py -> enforcer.py), and shut them down in reverse order when you are finished using ^C (enforcer.py -> analysis.py -> sensor.py). While `Guardian Angel` has error handling if one or more of the systems fail, firewall rules will not be written as each service depends on one another to properly sniff packets, identify patterns, and execute firewall rules.
+
+| Micro-Service | Description | Requirments |
+|-----------|------------|------------|
+| `sensor.py` | Sniffs packets and sends parsed telemetry data to `analysis.py` | Requires sudo |
+| `analysis.py` | Reads parsed telemtry data from sensor.py and identifies suspicious patterns. When thresholds are reached it will send commands to `enforcer.py` | No privileges |
+| `enforcer.py` | Writes firewall rules from recieved from `analysis.py` | Requires sudo |
+
+
 ## Defence Details
 
 * **Active Threat Detection**: The analysis engine monitors real-time telemetry to actively identify and mitigate the following behaviors:
