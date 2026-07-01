@@ -260,7 +260,6 @@ def analyze(packet):
 
 if __name__ == "__main__":
     load_sql_database()
-    print(block_times)
     print("\n[*] The Guardian Analyzer is Active.")
     while True:
         try:
@@ -277,13 +276,11 @@ if __name__ == "__main__":
                 try:
                     payload = packet_info["payload"]
                     signature = packet_info["signature"]
-                except Exception as error:
+                except:
                     print("[?] Malformed Packet")
-                    print(error)
                     continue
-            except Exception as error:
+            except:
                 print("[?] Error Decoding Bytes or Decoding JSON")
-                print(error)
                 continue
 
             if check_signature(payload, signature):

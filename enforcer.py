@@ -33,12 +33,12 @@ def check_signature(payload, signature):
 
 def block(ip):
     print(f"[*] Configuring firewall to BLOCK {ip}...")
-    # subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", ip, "-j", "DROP"])
+    subprocess.run(["sudo", "iptables", "-I", "FORWARD", "1", "-s", ip, "-j", "DROP"])
     print("[*] Guardian Angel has BLOCKED", ip)
 
 def unblock(ip):
     print(f"[*] Configuring firewall to UNBLOCK {ip}...")
-    # subprocess.run(["sudo", "iptables", "-D", "FORWARD", "-s", ip, "-j", "DROP"])
+    subprocess.run(["sudo", "iptables", "-D", "FORWARD", "-s", ip, "-j", "DROP"])
     print("[*] Guardian Angel has UNBLOCKED", ip)
 
 def execute(payload): 
@@ -70,13 +70,11 @@ if __name__ == "__main__":
                     try:
                         payload = packet_info["payload"]
                         signature = packet_info["signature"]
-                    except Exception as error:
+                    except:
                         print("[?] Malformed Packet")
-                        print(error)
                         continue
-                except Exception as error:
-                    print("[?] Error Decoding Bytes or JSON")
-                    print(error)
+                except:
+                    print("[?] Error Decoding Bytes or Decoding JSON")
                     continue
 
                 if check_signature(payload, signature):

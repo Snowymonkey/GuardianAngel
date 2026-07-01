@@ -74,7 +74,7 @@ if __name__ == "__main__":
         print("\n[*] Stopping the Guardian Sensor...")
     
     except Exception as error:
-        print(f"[?] Unknown Error: {error}")
+        print(f"[?] Unexpected error {error}")
 
     finally:
         sniffer.stop()
