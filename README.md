@@ -101,3 +101,7 @@ To use `Guardian Angel` start the processes in order (sensor.py -> analysis.py -
 * **Anomalous Scans**: Instantly catches stealthy, non-standard TCP reconnaissance sequences including Null (0) and Xmas (FPU) flag combinations.
 
 * **SSH Brute-Forcing**: Tracks successive connection attempt frequencies targeting TCP Port 22 to block high-rate credential-guessing.
+
+## Notes
+
+* Video coming soon!!
