@@ -2,6 +2,9 @@
 
 `Guardian Angel` is a distributed, multi-tier Intrusion Prevention System (IPS) designed to monitor, detect, and dynamically mitigate network attacks targeting a virtual network environment. Built as a collection of decoupled, highly resilient Python microservices, the system performs real-time traffic analysis, cryptographic validation, SQL-backed state persistence, and programmatic firewall orchestration. It was built and tested to be used in defending a Metaploitable 2 VM from a Kali attacker.
 
+An overview and demonstration of Guardian Angel can be found [here](https://youtu.be/x42tlK_LTnA).
+
+
 ## Features
 
 * **Multi-Tier Microservice Architecture**: Decouples sniffing, threat analysis, and firewall orchestration into three separate components (Sensor, Analyzer, and Enforcer) communicating over distinct UDP and TCP channels.
@@ -102,6 +105,3 @@ To use `Guardian Angel` start the processes in order (sensor.py -> analysis.py -
 
 * **SSH Brute-Forcing**: Tracks successive connection attempt frequencies targeting TCP Port 22 to block high-rate credential-guessing.
 
-## Notes
-
-* Video coming soon!!
